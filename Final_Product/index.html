@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SafeWalking: New Haven Crime-Aware Navigation</title>
+  
+  <!-- External Libraries -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
+  
+  <!-- Our Stylesheets -->
+  <link rel="stylesheet" href="styles.css" />
+</head>
+
+<body>
+  <div class="brand">
+    <div>
+      <h1>SafeWalking: New Haven</h1>
+      <p>Crime-aware routing</p>
+    </div>
+  </div>
+  
+  <header>
+    <div class="brand">
+      <div>
+        <h1>Find the safest walking routes for Yale students</h1>
+        <p>Using real neighborhood crime data & polygon boundaries</p>
+      </div>
+    </div>
+  
+    <div class="header-actions">
+      <div class="chip">
+        <span class="dot"></span>
+        <span id="headerStatus">Ready</span>
+      </div>
+    </div>
+  </header>
+
+  <div class="container">
+    <aside class="sidebar">
+      <div class="card">
+        <div class="card-title">
+          <h2>How to use</h2>
+          <span class="badge">Real Data</span>
+        </div>
+        <div class="instructions">
+          <strong>Quick steps</strong>
+          <div class="steps">
+            <div class="step">
+              <div class="step-num">1</div>
+              <div>Wait for streets to load from OpenStreetMap.</div>
+            </div>
+            <div class="step">
+              <div class="step-num">2</div>
+              <div>Click the map to set <b>Start</b> (green) and <b>End</b> (red).</div>
+            </div>
+            <div class="step">
+              <div class="step-num">3</div>
+              <div>Or type addresses below (New Haven area works best).</div>
+            </div>
+            <div class="step">
+              <div class="step-num">4</div>
+              <div>Click <b>Find Safest Route</b>.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="loadingIndicator" class="card">
+        <div class="loading-pill">
+          <div class="spinner"></div>
+          <div style="display:grid; gap:2px;">
+            <div style="font-weight:800; font-size:12px;">Loading street network…</div>
+            <div style="font-size:11px; color: var(--muted);">Fetching data from Overpass API</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">
+          <h2>Route inputs</h2>
+          <span class="badge">Click map or type</span>
+        </div>
+
+        <div class="control-group">
+          <label for="startInput">Start Address</label>
+          <input type="text" id="startInput" placeholder="e.g., 149 York St, New Haven, CT" />
+        </div>
+
+        <div class="control-group">
+          <label for="endInput">End Address</label>
+          <input type="text" id="endInput" placeholder="e.g., 344 College St, New Haven, CT" />
+        </div>
+
+        <div class="btn-row">
+          <button class="btn btn-primary" onclick="findSafestRoute()" id="findRouteBtn">
+            Find Safest Route
+          </button>
+          <button class="btn btn-secondary" onclick="clearRoute()">
+            Clear Route
+          </button>
+          <button class="btn btn-secondary" onclick="loadStreetData()">
+            Reload Street Data
+          </button>
+        </div>          
+      </div>
+
+      <div class="card">
+        <div class="card-title">
+          <h2>Street safety legend</h2>
+          <span class="badge">Colors match map</span>
+        </div>
+
+        <div class="legend-grid">
+          <div class="legend-item">
+            <div class="legend-swatch" style="background: var(--good);"></div>
+            <div>Safe <span style="color:var(--muted-2);">(0–2 crimes)</span></div>
+          </div>
+          <div class="legend-item">
+            <div class="legend-swatch" style="background: var(--warn);"></div>
+            <div>Moderate <span style="color:var(--muted-2);">(3–5 crimes)</span></div>
+          </div>
+          <div class="legend-item">
+            <div class="legend-swatch" style="background: var(--bad);"></div>
+            <div>Unsafe <span style="color:var(--muted-2);">(6–8 crimes)</span></div>
+          </div>
+          <div class="legend-item">
+            <div class="legend-swatch" style="background: var(--danger);"></div>
+            <div>Very Unsafe <span style="color:var(--muted-2);">(9+ crimes)</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div id="routeInfo" class="card">
+        <div class="card-title">
+          <h2>Route summary</h2>
+          <span class="badge" id="routeBadge">Calculated</span>
+        </div>
+
+        <div class="stats">
+          <div class="stat">
+            <span>Distance</span>
+            <b id="routeDistance">-</b>
+          </div>
+          <div class="stat">
+            <span>Total Crime Score</span>
+            <b id="routeCrimeScore">-</b>
+          </div>
+          <div class="stat">
+            <span>Segments</span>
+            <b id="routeSegments">-</b>
+          </div>
+        </div>
+
+        <div class="safety-score">
+          <div class="safety-indicator" id="safetyIndicator"></div>
+          <div class="safety-text">
+            <div class="small">Safety Rating</div>
+            <div class="big" id="safetyRating">-</div>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <main id="map">
+      <div class="map-overlay">
+        <div class="pill">
+          <span class="mini-dot" id="mapDot"></span>
+          <span id="mapPillText">Street network: loading…</span>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- External Libraries -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  
+  <!-- Our JavaScript Files -->
+  <script src="data.js"></script>
+  <script src="map.js"></script>
+  <script src="routing.js"></script>
+  <script src="ui.js"></script>
+  <script src="main.js"></script>
+</body>
+</html>
