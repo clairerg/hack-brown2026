@@ -25,6 +25,94 @@ function setStatus(loading, text) {
   }
   
   // ============================================================
+  // GEOLOCATION
+  // ============================================================
+
+  // Handle location button click
+  document.addEventListener('DOMContentLoaded', () => {
+    const locationBtn = document.getElementById('useLocationBtn');
+    if (locationBtn) {
+      locationBtn.addEventListener('click', handleLocationClick);
+    }
+  });
+
+  /**
+   * Handle 'Use my location' button click
+   */
+  async function handleLocationClick() {
+    const spinner = document.getElementById('locationSpinner');
+    const startInput = document.getElementById('startInput');
+    
+    if (!navigator.geolocation) {
+      alert('Geolocation is not supported by your browser');
+      return;
+    }
+
+    try {
+      // Show loading state
+      spinner.style.display = 'block';
+      this.disabled = true;
+      
+      // Get current position
+      const position = await new Promise((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 0
+        });
+      });
+
+      const { latitude, longitude } = position.coords;
+      
+      // Update the map view
+      if (window.map) {
+        window.map.setView([latitude, longitude], 16);
+      }
+      
+      // Set the start point
+      if (window.startMarker) window.map.removeLayer(window.startMarker);
+      
+      window.startMarker = L.marker([latitude, longitude], {
+        icon: L.divIcon({
+          className: 'custom-marker',
+          html: '<div style="background:#22c55e;width:20px;height:20px;border-radius:50%;border:3px solid white;box-shadow:0 10px 24px rgba(0,0,0,0.35);"></div>',
+          iconSize: [20, 20]
+        })
+      }).addTo(window.map);
+      
+      // Update the input field with the address
+      try {
+        const response = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`
+        );
+        const data = await response.json();
+        startInput.value = data.display_name || `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
+        if (window.startMarker) window.startMarker.bindPopup(startInput.value);
+      } catch (error) {
+        startInput.value = `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
+      }
+      
+      // Update the click count to indicate we have a start point
+      if (typeof window.clickCount !== 'undefined') {
+        window.clickCount = 1;
+      }
+      
+      // Set the start point for routing
+      if (window.startPoint) {
+        window.startPoint = { lat: latitude, lng: longitude };
+      }
+      
+    } catch (error) {
+      console.error('Error getting location:', error);
+      alert('Unable to retrieve your location. Please make sure location services are enabled and try again.');
+    } finally {
+      // Reset UI
+      spinner.style.display = 'none';
+      if (this) this.disabled = false;
+    }
+  }
+
+  // ============================================================
   // GEOCODING (ADDRESS SEARCH)
   // ============================================================
   
