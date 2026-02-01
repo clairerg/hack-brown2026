@@ -533,8 +533,20 @@
         </div>
 
         <div class="control-group">
-          <label for="startInput">Start Address</label>
-          <input type="text" id="startInput" placeholder="e.g., 149 York St, New Haven, CT" />
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <label for="startInput">Start Address</label>
+            <button id="useLocationBtn" class="location-btn" type="button" title="Use my current location" style="background: none; border: none; color: var(--muted); cursor: pointer; padding: 4px; display: flex; align-items: center; gap: 4px; font-size: 12px;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                <circle cx="12" cy="10" r="3"></circle>
+              </svg>
+              <span>Use my location</span>
+            </button>
+          </div>
+          <div style="position: relative;">
+            <input type="text" id="startInput" placeholder="e.g., 149 York St, New Haven, CT" style="padding-right: 40px;" />
+            <div id="locationSpinner" class="spinner" style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); display: none; width: 16px; height: 16px; border-width: 2px;"></div>
+          </div>
         </div>
 
         <div class="control-group">
@@ -1122,6 +1134,66 @@
       }
     });
 
+    // Handle location button click
+    document.getElementById('useLocationBtn').addEventListener('click', async function() {
+      const spinner = document.getElementById('locationSpinner');
+      const startInput = document.getElementById('startInput');
+      
+      if (!navigator.geolocation) {
+        alert('Geolocation is not supported by your browser');
+        return;
+      }
+
+      try {
+        spinner.style.display = 'block';
+        this.disabled = true;
+        
+        const position = await new Promise((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject, {
+            enableHighAccuracy: true,
+            timeout: 10000,
+            maximumAge: 0
+          });
+        });
+
+        const { latitude, longitude } = position.coords;
+        startPoint = { lat: latitude, lng: longitude };
+        
+        // Update the map view
+        map.setView([latitude, longitude], 16);
+        
+        // Add marker for current location
+        if (startMarker) map.removeLayer(startMarker);
+        startMarker = L.marker([latitude, longitude], {
+          icon: L.divIcon({
+            className: 'custom-marker',
+            html: '<div style="background:#22c55e;width:20px;height:20px;border-radius:50%;border:3px solid white;box-shadow:0 10px 24px rgba(0,0,0,0.35);"></div>',
+            iconSize: [20, 20]
+          })
+        }).addTo(map);
+        
+        // Try to get the address
+        try {
+          const response = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`
+          );
+          const data = await response.json();
+          startInput.value = data.display_name || `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
+          if (startMarker) startMarker.bindPopup(startInput.value);
+        } catch (error) {
+          startInput.value = `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
+        }
+        
+        clickCount = 1;
+      } catch (error) {
+        console.error('Error getting location:', error);
+        alert('Unable to retrieve your location. Please make sure location services are enabled and try again.');
+      } finally {
+        spinner.style.display = 'none';
+        this.disabled = false;
+      }
+    });
+    
     // Handle address input
     document.getElementById('startInput').addEventListener('change', async function(e) {
       const address = e.target.value.trim();
